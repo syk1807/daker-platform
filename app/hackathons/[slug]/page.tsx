@@ -16,13 +16,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import StatusBadge from "@/components/hackathon/StatusBadge";
 import CountdownTimer from "@/components/hackathon/CountdownTimer";
-import { hackathonDetails } from "@/lib/data/hackathons";
-import { hackathonSummaries } from "@/lib/data/hackathons";
+import { hackathonDetails, hackathonSummaries } from "@/lib/data/hackathons";
+import { initialLeaderboards } from "@/lib/data/leaderboards";
 import {
-  getLeaderboardBySlug, getTeams, getSubmissions, saveSubmission,
+  getTeams, getSubmissions, saveSubmission,
   toggleBookmark, getUser, initStorage
 } from "@/lib/storage";
-import { Team, LeaderboardEntry, Submission } from "@/types";
+import { Team, Submission } from "@/types";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("ko-KR", {
@@ -47,20 +47,32 @@ export default function HackathonDetailPage({ params }: { params: Promise<{ slug
   }
 
   const [teams, setTeams] = useState<Team[]>([]);
-  const [leaderboard, setLeaderboard] = useState<ReturnType<typeof getLeaderboardBySlug>>();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [bookmarked, setBookmarked] = useState(false);
   const [submitForm, setSubmitForm] = useState<Record<string, string>>({});
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [appliedTeams, setAppliedTeams] = useState<string[]>([]);
+
+  // 리더보드는 정적 데이터 직접 사용
+  const leaderboard = initialLeaderboards.find((l) => l.hackathonSlug === slug);
 
   useEffect(() => {
     initStorage();
     setTeams(getTeams().filter((t) => t.hackathonSlug === slug));
-    setLeaderboard(getLeaderboardBySlug(slug));
     setSubmissions(getSubmissions().filter((s) => s.hackathonSlug === slug));
     const user = getUser();
     setBookmarked(user.bookmarks.includes(slug));
+    const applied = JSON.parse(localStorage.getItem("daker_applied_teams") || "[]");
+    setAppliedTeams(applied);
   }, [slug]);
+
+  const handleApply = (teamCode: string) => {
+    const updated = appliedTeams.includes(teamCode)
+      ? appliedTeams.filter((c) => c !== teamCode)
+      : [...appliedTeams, teamCode];
+    setAppliedTeams(updated);
+    localStorage.setItem("daker_applied_teams", JSON.stringify(updated));
+  };
 
   const handleBookmark = () => {
     toggleBookmark(slug);
@@ -337,12 +349,34 @@ export default function HackathonDetailPage({ params }: { params: Promise<{ slug
                         </Badge>
                       </div>
                       <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{team.intro}</p>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1 mb-3">
                         {team.lookingFor.map((role) => (
                           <span key={role} className="text-xs px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full">
                             {role} 구함
                           </span>
                         ))}
+                      </div>
+                      <div className="flex items-center gap-2 pt-2 border-t dark:border-gray-700">
+                        {team.isOpen ? (
+                          <Button
+                            size="sm"
+                            variant={appliedTeams.includes(team.teamCode) ? "secondary" : "default"}
+                            className="flex-1 text-xs"
+                            onClick={() => handleApply(team.teamCode)}
+                          >
+                            {appliedTeams.includes(team.teamCode) ? "✅ 지원 완료 (취소)" : "이 팀에 지원하기"}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-gray-400">모집 마감된 팀입니다</span>
+                        )}
+                        {team.contact.url && team.contact.url !== "#" && (
+                          <a href={team.contact.url} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="outline" className="text-xs">
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              연락하기
+                            </Button>
+                          </a>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
