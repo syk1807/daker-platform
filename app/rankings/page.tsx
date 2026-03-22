@@ -1,13 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Trophy, ExternalLink } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { getLeaderboards, initStorage } from "@/lib/storage";
 import { hackathonSummaries } from "@/lib/data/hackathons";
-import { Leaderboard } from "@/types";
-import StatusBadge from "@/components/hackathon/StatusBadge";
+import { initialLeaderboards } from "@/lib/data/leaderboards";
 
 interface FlatEntry {
   rank: number;
@@ -21,16 +18,10 @@ interface FlatEntry {
 }
 
 export default function RankingsPage() {
-  const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
   const [selectedSlug, setSelectedSlug] = useState("all");
 
-  useEffect(() => {
-    initStorage();
-    setLeaderboards(getLeaderboards());
-  }, []);
-
   // 모든 해커톤 항목을 하나로 합치고 점수로 정렬
-  const allEntries: FlatEntry[] = leaderboards.flatMap((lb) => {
+  const allEntries: FlatEntry[] = initialLeaderboards.flatMap((lb) => {
     const hackathon = hackathonSummaries.find((h) => h.slug === lb.hackathonSlug);
     return lb.entries.map((e) => ({
       ...e,

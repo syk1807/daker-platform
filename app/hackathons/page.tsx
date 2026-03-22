@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import HackathonCard from "@/components/hackathon/HackathonCard";
-import { HackathonSummary, HackathonStatus } from "@/types";
-import { getHackathons, initStorage } from "@/lib/storage";
-
+import { HackathonStatus } from "@/types";
+import { hackathonSummaries } from "@/lib/data/hackathons";
 const STATUS_FILTERS: { value: HackathonStatus | "all"; label: string }[] = [
   { value: "all", label: "전체" },
   { value: "ongoing", label: "진행중" },
@@ -18,16 +17,10 @@ const STATUS_FILTERS: { value: HackathonStatus | "all"; label: string }[] = [
 const ALL_TAGS = ["LLM", "Compression", "vLLM", "Idea", "GenAI", "Workflow", "VibeCoding", "Web", "Vercel", "Handover"];
 
 export default function HackathonsPage() {
-  const [hackathons, setHackathons] = useState<HackathonSummary[]>([]);
   const [statusFilter, setStatusFilter] = useState<HackathonStatus | "all">("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [showTagFilter, setShowTagFilter] = useState(false);
-
-  useEffect(() => {
-    initStorage();
-    setHackathons(getHackathons());
-  }, []);
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
@@ -35,7 +28,7 @@ export default function HackathonsPage() {
     );
   };
 
-  const filtered = hackathons.filter((h) => {
+  const filtered = hackathonSummaries.filter((h) => {
     if (statusFilter !== "all" && h.status !== statusFilter) return false;
     if (selectedTags.length > 0 && !selectedTags.some((t) => h.tags.includes(t))) return false;
     if (search && !h.title.toLowerCase().includes(search.toLowerCase())) return false;

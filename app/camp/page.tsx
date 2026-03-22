@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import { Plus, Users, Search, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +17,10 @@ import { hackathonSummaries } from "@/lib/data/hackathons";
 
 const ROLES = ["Frontend", "Backend", "ML Engineer", "Designer", "PM"];
 
-function CampContent() {
-  const searchParams = useSearchParams();
-  const hackathonFilter = searchParams.get("hackathon") || "all";
-
+export default function CampPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [search, setSearch] = useState("");
-  const [selectedHackathon, setSelectedHackathon] = useState(hackathonFilter);
+  const [selectedHackathon, setSelectedHackathon] = useState("all");
   const [showOpen, setShowOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mySkills, setMySkills] = useState<string[]>([]);
@@ -32,7 +28,7 @@ function CampContent() {
   // 팀 생성 폼
   const [form, setForm] = useState({
     name: "",
-    hackathonSlug: hackathonFilter !== "all" ? hackathonFilter : "daker-handover-2026-03",
+    hackathonSlug: "daker-handover-2026-03",
     intro: "",
     lookingFor: [] as string[],
     contactUrl: "",
@@ -43,6 +39,10 @@ function CampContent() {
     setTeams(getTeams());
     const user = getUser();
     setMySkills(user.skills || []);
+    // URL 파라미터에서 hackathon 필터 읽기
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get("hackathon");
+    if (slug) setSelectedHackathon(slug);
   }, []);
 
   const toggleRole = (role: string) => {
@@ -315,10 +315,3 @@ function CampContent() {
   );
 }
 
-export default function CampPage() {
-  return (
-    <Suspense fallback={<div className="flex items-center justify-center h-64 text-gray-400">로딩 중...</div>}>
-      <CampContent />
-    </Suspense>
-  );
-}
