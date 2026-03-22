@@ -17,8 +17,23 @@ interface FlatEntry {
   artifacts?: { webUrl?: string; pdfUrl?: string };
 }
 
+type PeriodFilter = "all" | "30d" | "7d";
+
+const PERIOD_OPTIONS: { value: PeriodFilter; label: string }[] = [
+  { value: "all", label: "전체" },
+  { value: "30d", label: "최근 30일" },
+  { value: "7d", label: "최근 7일" },
+];
+
+function withinDays(isoDate: string, days: number): boolean {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return new Date(isoDate) >= cutoff;
+}
+
 export default function RankingsPage() {
   const [selectedSlug, setSelectedSlug] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
 
   // 모든 해커톤 항목을 하나로 합치고 점수로 정렬
   const allEntries: FlatEntry[] = initialLeaderboards.flatMap((lb) => {
@@ -33,11 +48,19 @@ export default function RankingsPage() {
   // 글로벌 순위: 점수 내림차순
   const globalRanked = [...allEntries].sort((a, b) => b.score - a.score);
 
-  const filtered = selectedSlug === "all"
-    ? globalRanked
-    : allEntries
-        .filter((e) => e.hackathonSlug === selectedSlug)
-        .sort((a, b) => b.score - a.score);
+  const periodFiltered = (entries: FlatEntry[]) => {
+    if (periodFilter === "7d") return entries.filter((e) => withinDays(e.submittedAt, 7));
+    if (periodFilter === "30d") return entries.filter((e) => withinDays(e.submittedAt, 30));
+    return entries;
+  };
+
+  const filtered = periodFiltered(
+    selectedSlug === "all"
+      ? globalRanked
+      : allEntries
+          .filter((e) => e.hackathonSlug === selectedSlug)
+          .sort((a, b) => b.score - a.score)
+  );
 
   const getRankDisplay = (idx: number, slug: string) => {
     if (selectedSlug !== "all") return idx + 1;
@@ -91,6 +114,23 @@ export default function RankingsPage() {
           })}
         </div>
       )}
+
+      {/* 기간 필터 */}
+      <div className="flex gap-2 mb-3">
+        {PERIOD_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setPeriodFilter(opt.value)}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              periodFilter === opt.value
+                ? "bg-gray-800 dark:bg-white text-white dark:text-gray-900"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
 
       {/* 해커톤 필터 */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1">

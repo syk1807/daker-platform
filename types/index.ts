@@ -6,6 +6,7 @@ export interface HackathonSummary {
   status: HackathonStatus;
   tags: string[];
   thumbnailUrl: string;
+  participantCount?: number;
   period: {
     timezone: string;
     submissionDeadlineAt: string;

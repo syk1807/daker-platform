@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Users, Search, ExternalLink } from "lucide-react";
+import { Plus, Users, Search, ExternalLink, Pencil, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,38 +12,67 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Team } from "@/types";
-import { getTeams, saveTeam, generateTeamCode, initStorage, getUser } from "@/lib/storage";
+import {
+  getTeams, saveTeam, generateTeamCode, initStorage, getUser,
+  getMyTeamCodes,
+} from "@/lib/storage";
 import { hackathonSummaries } from "@/lib/data/hackathons";
 
 const ROLES = ["Frontend", "Backend", "ML Engineer", "Designer", "PM"];
 
+const EMPTY_FORM = {
+  name: "",
+  hackathonSlug: "daker-handover-2026-03",
+  intro: "",
+  lookingFor: [] as string[],
+  contactUrl: "",
+};
+
 export default function CampPage() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [myTeamCodes, setMyTeamCodes] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [selectedHackathon, setSelectedHackathon] = useState("all");
   const [showOpen, setShowOpen] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [mySkills, setMySkills] = useState<string[]>([]);
 
-  // 팀 생성 폼
-  const [form, setForm] = useState({
-    name: "",
-    hackathonSlug: "daker-handover-2026-03",
-    intro: "",
-    lookingFor: [] as string[],
-    contactUrl: "",
-  });
+  // 팀 생성/수정 다이얼로그
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  const refreshTeams = () => {
+    setTeams(getTeams());
+    setMyTeamCodes(getMyTeamCodes());
+  };
 
   useEffect(() => {
     initStorage();
-    setTeams(getTeams());
+    refreshTeams();
     const user = getUser();
     setMySkills(user.skills || []);
-    // URL 파라미터에서 hackathon 필터 읽기
     const params = new URLSearchParams(window.location.search);
     const slug = params.get("hackathon");
     if (slug) setSelectedHackathon(slug);
   }, []);
+
+  const openCreateDialog = () => {
+    setEditingTeam(null);
+    setForm(EMPTY_FORM);
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (team: Team) => {
+    setEditingTeam(team);
+    setForm({
+      name: team.name,
+      hackathonSlug: team.hackathonSlug,
+      intro: team.intro,
+      lookingFor: [...team.lookingFor],
+      contactUrl: team.contact.url === "#" ? "" : team.contact.url,
+    });
+    setDialogOpen(true);
+  };
 
   const toggleRole = (role: string) => {
     setForm((prev) => ({
@@ -54,23 +83,41 @@ export default function CampPage() {
     }));
   };
 
-  const handleCreate = () => {
+  const handleSave = () => {
     if (!form.name.trim()) return;
-    const newTeam: Team = {
-      teamCode: generateTeamCode(),
-      hackathonSlug: form.hackathonSlug,
-      name: form.name,
-      isOpen: true,
-      memberCount: 1,
-      lookingFor: form.lookingFor,
-      intro: form.intro,
-      contact: { type: "link", url: form.contactUrl || "#" },
-      createdAt: new Date().toISOString(),
-    };
-    saveTeam(newTeam);
-    setTeams(getTeams());
+    if (editingTeam) {
+      // 수정
+      const updated: Team = {
+        ...editingTeam,
+        name: form.name,
+        hackathonSlug: form.hackathonSlug,
+        intro: form.intro,
+        lookingFor: form.lookingFor,
+        contact: { type: "link", url: form.contactUrl || "#" },
+      };
+      saveTeam(updated);
+    } else {
+      // 생성
+      const newTeam: Team = {
+        teamCode: generateTeamCode(),
+        hackathonSlug: form.hackathonSlug,
+        name: form.name,
+        isOpen: true,
+        memberCount: 1,
+        lookingFor: form.lookingFor,
+        intro: form.intro,
+        contact: { type: "link", url: form.contactUrl || "#" },
+        createdAt: new Date().toISOString(),
+      };
+      saveTeam(newTeam, true);
+    }
+    refreshTeams();
     setDialogOpen(false);
-    setForm({ name: "", hackathonSlug: "daker-handover-2026-03", intro: "", lookingFor: [], contactUrl: "" });
+  };
+
+  const handleCloseRecruitment = (team: Team) => {
+    saveTeam({ ...team, isOpen: false });
+    refreshTeams();
   };
 
   // 팀 매칭 추천: 내 스킬을 필요로 하는 팀 상단 정렬
@@ -87,9 +134,8 @@ export default function CampPage() {
     return true;
   });
 
-  const getHackathonTitle = (slug: string) => {
-    return hackathonSummaries.find((h) => h.slug === slug)?.title || slug;
-  };
+  const getHackathonTitle = (slug: string) =>
+    hackathonSummaries.find((h) => h.slug === slug)?.title || slug;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -100,15 +146,16 @@ export default function CampPage() {
           <p className="text-gray-500 dark:text-gray-400">함께할 팀원을 찾거나, 새 팀을 만들어보세요.</p>
         </div>
 
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={openCreateDialog}>
           <Plus className="h-4 w-4 mr-2" />
           팀 만들기
         </Button>
 
+        {/* 생성/수정 다이얼로그 */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>새 팀 만들기</DialogTitle>
+              <DialogTitle>{editingTeam ? "팀 정보 수정" : "새 팀 만들기"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-2">
               <div>
@@ -169,8 +216,8 @@ export default function CampPage() {
                   className="mt-1"
                 />
               </div>
-              <Button className="w-full" onClick={handleCreate} disabled={!form.name.trim()}>
-                팀 생성하기
+              <Button className="w-full" onClick={handleSave} disabled={!form.name.trim()}>
+                {editingTeam ? "수정 완료" : "팀 생성하기"}
               </Button>
             </div>
           </DialogContent>
@@ -238,17 +285,19 @@ export default function CampPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((team) => {
             const isMatch = mySkills.some((s) => team.lookingFor.includes(s));
+            const isMine = myTeamCodes.includes(team.teamCode);
             return (
               <Card
                 key={team.teamCode}
-                className={`dark:border-gray-700 ${isMatch ? "ring-2 ring-purple-400 dark:ring-purple-600" : ""}`}
+                className={`dark:border-gray-700 ${isMatch ? "ring-2 ring-purple-400 dark:ring-purple-600" : ""} ${isMine ? "ring-2 ring-blue-400 dark:ring-blue-600" : ""}`}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-gray-900 dark:text-white">{team.name}</span>
-                        {isMatch && <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded-full">추천</span>}
+                        {isMine && <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-full">내 팀</span>}
+                        {isMatch && !isMine && <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded-full">추천</span>}
                       </div>
                       <div className="text-xs text-gray-400 mt-0.5">{getHackathonTitle(team.hackathonSlug).slice(0, 25)}…</div>
                     </div>
@@ -280,18 +329,40 @@ export default function CampPage() {
 
                   <div className="flex items-center justify-between text-xs text-gray-400">
                     <span>👥 {team.memberCount}명</span>
-                    {team.contact.url && team.contact.url !== "#" && (
-                      <a
-                        href={team.contact.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-blue-500 hover:text-blue-600"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        연락하기
-                      </a>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {team.contact.url && team.contact.url !== "#" && (
+                        <a
+                          href={team.contact.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-blue-500 hover:text-blue-600"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          연락하기
+                        </a>
+                      )}
+                      {isMine && (
+                        <>
+                          <button
+                            onClick={() => openEditDialog(team)}
+                            className="flex items-center gap-0.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            수정
+                          </button>
+                          {team.isOpen && (
+                            <button
+                              onClick={() => handleCloseRecruitment(team)}
+                              className="flex items-center gap-0.5 text-red-400 hover:text-red-600"
+                            >
+                              <XCircle className="h-3 w-3" />
+                              마감
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -305,7 +376,7 @@ export default function CampPage() {
             {search ? "검색 결과가 없습니다" : "아직 팀이 없습니다"}
           </h3>
           <p className="text-sm text-gray-500 mb-4">첫 번째 팀을 만들어보세요!</p>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={openCreateDialog}>
             <Plus className="h-4 w-4 mr-2" />
             팀 만들기
           </Button>
@@ -314,4 +385,3 @@ export default function CampPage() {
     </div>
   );
 }
-

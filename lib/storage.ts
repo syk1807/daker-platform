@@ -10,7 +10,18 @@ const KEYS = {
   submissions: "daker_submissions",
   user: "daker_user",
   theme: "daker_theme",
+  myTeams: "daker_my_teams",
+  applications: "daker_applications",
 } as const;
+
+export interface TeamApplication {
+  id: string;
+  teamCode: string;
+  applicantName: string;
+  message: string;
+  status: "pending" | "accepted" | "rejected";
+  appliedAt: string;
+}
 
 function getItem<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -54,7 +65,7 @@ export function getTeams(): Team[] {
   return getItem<Team[]>(KEYS.teams, initialTeams);
 }
 
-export function saveTeam(team: Team): void {
+export function saveTeam(team: Team, markAsMine = false): void {
   const teams = getTeams();
   const idx = teams.findIndex((t) => t.teamCode === team.teamCode);
   if (idx >= 0) {
@@ -63,6 +74,43 @@ export function saveTeam(team: Team): void {
     teams.push(team);
   }
   setItem(KEYS.teams, teams);
+  if (markAsMine) {
+    const mine = getMyTeamCodes();
+    if (!mine.includes(team.teamCode)) {
+      setItem(KEYS.myTeams, [...mine, team.teamCode]);
+    }
+  }
+}
+
+// My Teams
+export function getMyTeamCodes(): string[] {
+  return getItem<string[]>(KEYS.myTeams, []);
+}
+
+// Applications
+export function getApplications(): TeamApplication[] {
+  return getItem<TeamApplication[]>(KEYS.applications, []);
+}
+
+export function saveApplication(app: TeamApplication): void {
+  const apps = getApplications();
+  const idx = apps.findIndex((a) => a.id === app.id);
+  if (idx >= 0) apps[idx] = app; else apps.push(app);
+  setItem(KEYS.applications, apps);
+}
+
+export function updateApplicationStatus(id: string, status: "accepted" | "rejected"): void {
+  const apps = getApplications();
+  const app = apps.find((a) => a.id === id);
+  if (app) {
+    app.status = status;
+    setItem(KEYS.applications, apps);
+    if (status === "accepted") {
+      const teams = getTeams();
+      const team = teams.find((t) => t.teamCode === app.teamCode);
+      if (team) { team.memberCount += 1; setItem(KEYS.teams, teams); }
+    }
+  }
 }
 
 export function deleteTeam(teamCode: string): void {

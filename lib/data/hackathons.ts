@@ -7,6 +7,7 @@ export const hackathonSummaries: HackathonSummary[] = [
     status: "ended",
     tags: ["LLM", "Compression", "vLLM"],
     thumbnailUrl: "/images/aimers8.png",
+    participantCount: 134,
     period: {
       timezone: "Asia/Seoul",
       submissionDeadlineAt: "2026-02-25T10:00:00+09:00",
@@ -24,6 +25,7 @@ export const hackathonSummaries: HackathonSummary[] = [
     status: "ongoing",
     tags: ["Idea", "GenAI", "Workflow"],
     thumbnailUrl: "/images/vibe202602.png",
+    participantCount: 57,
     period: {
       timezone: "Asia/Seoul",
       submissionDeadlineAt: "2026-03-03T10:00:00+09:00",
@@ -41,6 +43,7 @@ export const hackathonSummaries: HackathonSummary[] = [
     status: "upcoming",
     tags: ["VibeCoding", "Web", "Vercel", "Handover"],
     thumbnailUrl: "/images/daker-handover.png",
+    participantCount: 23,
     period: {
       timezone: "Asia/Seoul",
       submissionDeadlineAt: "2026-03-30T10:00:00+09:00",

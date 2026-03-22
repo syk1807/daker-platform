@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, Calendar, ArrowRight } from "lucide-react";
+import { Heart, Calendar, ArrowRight, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,10 +97,18 @@ export default function HackathonCard({ hackathon }: { hackathon: HackathonSumma
             {hackathon.title}
           </h3>
 
-          {/* 날짜 */}
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-auto">
-            <Calendar className="h-3.5 w-3.5" />
-            <span>마감 {formatDate(hackathon.period.submissionDeadlineAt)}</span>
+          {/* 날짜 + 참가자 */}
+          <div className="flex items-center justify-between mt-auto">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <Calendar className="h-3.5 w-3.5" />
+              <span>마감 {formatDate(hackathon.period.submissionDeadlineAt)}</span>
+            </div>
+            {hackathon.participantCount !== undefined && (
+              <div className="flex items-center gap-1 text-xs text-gray-400">
+                <Users className="h-3 w-3" />
+                <span>{hackathon.participantCount}명</span>
+              </div>
+            )}
           </div>
 
           {/* 버튼 */}

@@ -20,7 +20,9 @@ import { hackathonDetails, hackathonSummaries } from "@/lib/data/hackathons";
 import { initialLeaderboards } from "@/lib/data/leaderboards";
 import {
   getTeams, getSubmissions, saveSubmission,
-  toggleBookmark, getUser, initStorage
+  toggleBookmark, getUser, initStorage,
+  getMyTeamCodes, getApplications, saveApplication, updateApplicationStatus,
+  TeamApplication,
 } from "@/lib/storage";
 import { Team, Submission } from "@/types";
 
@@ -51,27 +53,64 @@ export default function HackathonDetailPage({ params }: { params: Promise<{ slug
   const [bookmarked, setBookmarked] = useState(false);
   const [submitForm, setSubmitForm] = useState<Record<string, string>>({});
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
-  const [appliedTeams, setAppliedTeams] = useState<string[]>([]);
+  const [myTeamCodes, setMyTeamCodes] = useState<string[]>([]);
+  const [applications, setApplications] = useState<TeamApplication[]>([]);
+  const [nickname, setNickname] = useState("");
+  const [expandedApplicants, setExpandedApplicants] = useState<string[]>([]);
 
   // 리더보드는 정적 데이터 직접 사용
   const leaderboard = initialLeaderboards.find((l) => l.hackathonSlug === slug);
 
+  const refreshData = () => {
+    setTeams(getTeams().filter((t) => t.hackathonSlug === slug));
+    setApplications(getApplications());
+    setMyTeamCodes(getMyTeamCodes());
+  };
+
   useEffect(() => {
     initStorage();
-    setTeams(getTeams().filter((t) => t.hackathonSlug === slug));
+    refreshData();
     setSubmissions(getSubmissions().filter((s) => s.hackathonSlug === slug));
     const user = getUser();
     setBookmarked(user.bookmarks.includes(slug));
-    const applied = JSON.parse(localStorage.getItem("daker_applied_teams") || "[]");
-    setAppliedTeams(applied);
+    setNickname(user.nickname || "익명");
   }, [slug]);
 
+  const getMyApplication = (teamCode: string) =>
+    applications.find((a) => a.teamCode === teamCode && a.applicantName === nickname);
+
   const handleApply = (teamCode: string) => {
-    const updated = appliedTeams.includes(teamCode)
-      ? appliedTeams.filter((c) => c !== teamCode)
-      : [...appliedTeams, teamCode];
-    setAppliedTeams(updated);
-    localStorage.setItem("daker_applied_teams", JSON.stringify(updated));
+    const existing = getMyApplication(teamCode);
+    if (existing) {
+      // 지원 취소 (pending만 취소 가능)
+      if (existing.status === "pending") {
+        const updated = applications.filter((a) => a.id !== existing.id);
+        localStorage.setItem("daker_applications", JSON.stringify(updated));
+        setApplications(updated);
+      }
+      return;
+    }
+    const app: TeamApplication = {
+      id: Date.now().toString(),
+      teamCode,
+      applicantName: nickname || "익명",
+      message: "",
+      status: "pending",
+      appliedAt: new Date().toISOString(),
+    };
+    saveApplication(app);
+    setApplications(getApplications());
+  };
+
+  const handleApplicationStatus = (id: string, status: "accepted" | "rejected") => {
+    updateApplicationStatus(id, status);
+    refreshData();
+  };
+
+  const toggleApplicantExpand = (teamCode: string) => {
+    setExpandedApplicants((prev) =>
+      prev.includes(teamCode) ? prev.filter((c) => c !== teamCode) : [...prev, teamCode]
+    );
   };
 
   const handleBookmark = () => {
@@ -339,48 +378,107 @@ export default function HackathonDetailPage({ params }: { params: Promise<{ slug
             </div>
             {teams.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {teams.map((team) => (
-                  <Card key={team.teamCode} className="dark:border-gray-700">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="font-semibold">{team.name}</div>
-                        <Badge variant={team.isOpen ? "default" : "secondary"} className="text-xs">
-                          {team.isOpen ? "모집중" : "마감"}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{team.intro}</p>
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {team.lookingFor.map((role) => (
-                          <span key={role} className="text-xs px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full">
-                            {role} 구함
-                          </span>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2 pt-2 border-t dark:border-gray-700">
-                        {team.isOpen ? (
-                          <Button
-                            size="sm"
-                            variant={appliedTeams.includes(team.teamCode) ? "secondary" : "default"}
-                            className="flex-1 text-xs"
-                            onClick={() => handleApply(team.teamCode)}
-                          >
-                            {appliedTeams.includes(team.teamCode) ? "✅ 지원 완료 (취소)" : "이 팀에 지원하기"}
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-gray-400">모집 마감된 팀입니다</span>
+                {teams.map((team) => {
+                  const isMine = myTeamCodes.includes(team.teamCode);
+                  const myApp = getMyApplication(team.teamCode);
+                  const teamApps = applications.filter((a) => a.teamCode === team.teamCode);
+                  const pendingApps = teamApps.filter((a) => a.status === "pending");
+                  const isExpanded = expandedApplicants.includes(team.teamCode);
+                  return (
+                    <Card key={team.teamCode} className={`dark:border-gray-700 ${isMine ? "ring-2 ring-blue-400 dark:ring-blue-600" : ""}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold">{team.name}</span>
+                              {isMine && <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-1.5 py-0.5 rounded-full">내 팀</span>}
+                            </div>
+                            <div className="text-xs text-gray-400 mt-0.5">👥 {team.memberCount}명</div>
+                          </div>
+                          <Badge variant={team.isOpen ? "default" : "secondary"} className="text-xs">
+                            {team.isOpen ? "모집중" : "마감"}
+                          </Badge>
+                        </div>
+
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{team.intro}</p>
+
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {team.lookingFor.map((role) => (
+                            <span key={role} className="text-xs px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full">
+                              {role} 구함
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* 지원자 관리 (팀장용) */}
+                        {isMine && teamApps.length > 0 && (
+                          <div className="mb-3 border-t dark:border-gray-700 pt-3">
+                            <button
+                              onClick={() => toggleApplicantExpand(team.teamCode)}
+                              className="text-xs font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1"
+                            >
+                              지원자 {pendingApps.length}명 대기 / 전체 {teamApps.length}명
+                              <span>{isExpanded ? "▲" : "▼"}</span>
+                            </button>
+                            {isExpanded && (
+                              <div className="mt-2 space-y-2">
+                                {teamApps.map((app) => (
+                                  <div key={app.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                                    <div>
+                                      <span className="text-sm font-medium">{app.applicantName}</span>
+                                      <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
+                                        app.status === "accepted" ? "bg-green-100 text-green-600" :
+                                        app.status === "rejected" ? "bg-red-100 text-red-500" :
+                                        "bg-yellow-100 text-yellow-600"
+                                      }`}>
+                                        {app.status === "accepted" ? "수락됨" : app.status === "rejected" ? "거절됨" : "대기중"}
+                                      </span>
+                                    </div>
+                                    {app.status === "pending" && (
+                                      <div className="flex gap-1">
+                                        <Button size="sm" className="text-xs h-7 px-2" onClick={() => handleApplicationStatus(app.id, "accepted")}>수락</Button>
+                                        <Button size="sm" variant="outline" className="text-xs h-7 px-2 text-red-500" onClick={() => handleApplicationStatus(app.id, "rejected")}>거절</Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
-                        {team.contact.url && team.contact.url !== "#" && (
-                          <a href={team.contact.url} target="_blank" rel="noopener noreferrer">
-                            <Button size="sm" variant="outline" className="text-xs">
-                              <ExternalLink className="h-3 w-3 mr-1" />
-                              연락하기
-                            </Button>
-                          </a>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+
+                        {/* 지원/연락 버튼 */}
+                        <div className="flex items-center gap-2 pt-2 border-t dark:border-gray-700">
+                          {!isMine && (
+                            team.isOpen ? (
+                              <Button
+                                size="sm"
+                                variant={myApp ? "secondary" : "default"}
+                                className="flex-1 text-xs"
+                                onClick={() => handleApply(team.teamCode)}
+                                disabled={myApp?.status === "accepted" || myApp?.status === "rejected"}
+                              >
+                                {myApp?.status === "accepted" ? "✅ 수락됨" :
+                                 myApp?.status === "rejected" ? "❌ 거절됨" :
+                                 myApp ? "지원 완료 (취소)" : "이 팀에 지원하기"}
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-gray-400">모집 마감된 팀입니다</span>
+                            )
+                          )}
+                          {team.contact.url && team.contact.url !== "#" && (
+                            <a href={team.contact.url} target="_blank" rel="noopener noreferrer">
+                              <Button size="sm" variant="outline" className="text-xs">
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                연락하기
+                              </Button>
+                            </a>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-12 text-gray-500">
