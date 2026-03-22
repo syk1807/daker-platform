@@ -489,6 +489,20 @@ export default function HackathonDetailPage({ params }: { params: Promise<{ slug
                   </span>
                 )}
               </div>
+
+              {/* 점수 기준 표시 */}
+              {detail.sections.eval.scoreDisplay && (
+                <div className="flex gap-3 mb-4 flex-wrap">
+                  {detail.sections.eval.scoreDisplay.breakdown.map((b) => (
+                    <div key={b.key} className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-1.5">
+                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="text-xs text-gray-600 dark:text-gray-300">{b.label}</span>
+                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{b.weightPercent}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {leaderboard && leaderboard.entries.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -552,6 +566,25 @@ export default function HackathonDetailPage({ params }: { params: Promise<{ slug
                   <p>아직 리더보드 데이터가 없습니다.</p>
                 </div>
               )}
+              {/* 미제출 팀 */}
+              {teams.length > 0 && leaderboard && (() => {
+                const submittedNames = leaderboard.entries.map((e) => e.teamName);
+                const unsubmitted = teams.filter((t) => !submittedNames.includes(t.name));
+                if (unsubmitted.length === 0) return null;
+                return (
+                  <div className="mt-4 border-t dark:border-gray-700 pt-4">
+                    <p className="text-xs font-medium text-gray-500 mb-2">미제출 팀</p>
+                    <div className="space-y-1">
+                      {unsubmitted.map((t) => (
+                        <div key={t.teamCode} className="flex items-center justify-between text-sm py-1">
+                          <span className="text-gray-600 dark:text-gray-300">{t.name}</span>
+                          <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">순위 없음</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               <p className="text-xs text-gray-400 mt-4">{detail.sections.leaderboard.note}</p>
             </CardContent>
           </Card>

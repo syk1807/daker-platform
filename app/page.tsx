@@ -113,12 +113,12 @@ export default function HomePage() {
       <div className="bg-gray-900 dark:bg-gray-800 text-white py-4">
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-3 gap-4 text-center">
           <div>
-            <div className="text-2xl font-bold text-blue-400">{hackathons.length}</div>
+            <div className="text-2xl font-bold text-blue-400">{hackathonSummaries.length}</div>
             <div className="text-xs text-gray-400">총 해커톤</div>
           </div>
           <div>
             <div className="text-2xl font-bold text-green-400">
-              {hackathons.filter((h) => h.status === "ongoing").length}
+              {hackathonSummaries.filter((h) => h.status === "ongoing").length}
             </div>
             <div className="text-xs text-gray-400">진행 중</div>
           </div>
